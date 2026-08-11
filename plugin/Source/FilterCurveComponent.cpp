@@ -16,7 +16,7 @@ FilterCurveComponent::FilterCurveComponent(FilterAudioProcessor& processor)
     : mProcessor(processor),
       mSampleRate(44100.0f)
 {
-    // Register as listener to parameter changes. TODO Also done in processor ??
+    // Register as listener to parameter changes.
     mProcessor.getApvts().addParameterListener("CUTOFF", this);
     mProcessor.getApvts().addParameterListener("RESONANCE", this);
     mProcessor.getApvts().addParameterListener("GAIN", this);
@@ -99,7 +99,7 @@ void FilterCurveComponent::paint(juce::Graphics& g)
 
     // Draw solid line on top of fill
     g.setColour(juce::Colours::blueviolet);
-    g.strokePath(mCurvePath, juce::PathStrokeType(2.0f));    // this draw a line from slope end to with   !!!!!!!!!!
+    g.strokePath(mCurvePath, juce::PathStrokeType(2.0f));
 }
 
 
@@ -110,12 +110,12 @@ void FilterCurveComponent::resized()
 
 void FilterCurveComponent::setBounds(const juce::Rectangle<int>& bounds)
 {
-    juce::Component::setBounds(bounds);
-    // Regenerate curve when bounds change
-    if (bounds.getWidth() > 0 && bounds.getHeight() > 0)
-    {
-        generateCurvePath();
-    }
+    // juce::Component::setBounds(bounds);
+    // // Regenerate curve when bounds change
+    // if (bounds.getWidth() > 0 && bounds.getHeight() > 0)
+    // {
+    //     generateCurvePath();
+    // }
 }
 
 void FilterCurveComponent::setBounds(int x, int y, int width, int height)
@@ -286,40 +286,40 @@ void FilterCurveComponent::generateCurvePath()
 
     mCurvePath.clear();
     mCurvePoints.clear();
-    
+
     auto bounds = getLocalBounds();
     float width = static_cast<float>(bounds.getWidth());
     float height = static_cast<float>(bounds.getHeight());
-    
+
     // Safety check: ensure sample rate is valid
     if (mSampleRate <= 0.0f)
         mSampleRate = 44100.0f; // Fallback to default
-    
+
     if (width <= 0 || height <= 0)
         return;
-    
+
     // Get filter type to determine stopband behavior
     int filterTypeInt = static_cast<int>(mFilterType->load());
     MultiFilter::FilterType filterTypeEnum = static_cast<MultiFilter::FilterType>(filterTypeInt);
-    
+
     // Generate points across the frequency spectrum
     for (int i = 0; i < NUM_POINTS; ++i)
     {
         // Use logarithmic spacing for better resolution at low frequencies
         float normalizedPos = static_cast<float>(i) / (NUM_POINTS - 1);
         float logFreq = MIN_FREQ * std::pow(MAX_FREQ / MIN_FREQ, normalizedPos);
-        
+
         float freq = logFreq;
         float mag = calculateMagnitudeAt(freq);
         float x = freqToX(freq, width);
         float y = magToY(mag, height);
-        
+
         // Clamp coordinates to valid range to prevent NaN/Inf issues
         if (!std::isfinite(x) || x < 0) x = 0;
         else if (x > width) x = width;
         if (!std::isfinite(y) || y < 0) y = 0;
         else if (y > height) y = height;
-        
+
         if (i == 0)
         {
             mCurvePath.startNewSubPath(x, y);
@@ -331,12 +331,12 @@ void FilterCurveComponent::generateCurvePath()
             mCurvePoints.emplace_back(x, y);
         }
     }
-    
+
     // Add flat stopband extensions based on filter type
     // For LowPass: extend right edge horizontally at stopband level
     // For HighPass: extend left edge horizontally at stopband level
     // For others: extend both sides appropriately
-    
+
     const float stopbandY = height; // Bottom of component (MIN_DB maps to height)
     //   HAS NO EFFECT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     switch (filterTypeEnum)
