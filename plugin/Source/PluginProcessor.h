@@ -9,6 +9,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "FilterCoefficients.h"
 #include "MultiFilter.h"
 #include "ParameterLayout.h"
 
@@ -48,6 +49,8 @@ public:
     double getTailLengthSeconds() const override;
 
     juce::AudioProcessorValueTreeState& getApvts() { return apvts; }
+    
+    FilterCoefficients& getFilterCoefficients() { return mFilterCoefficients; }
 
     //==============================================================================
     int getNumPrograms() override;
@@ -72,9 +75,13 @@ public:
     }
 
 private:
-    MultiFilter mFilterRight;
-    MultiFilter mFilterLeft;
-    MultiFilter mFilter[2]{ mFilterLeft, mFilterRight };
+    // Shared coefficient cache - single source of truth for filter coefficients
+    FilterCoefficients mFilterCoefficients;
+    
+    // Filter instances - use unique_ptr to handle construction with FilterCoefficients reference
+    std::unique_ptr<MultiFilter> mFilterLeft;
+    std::unique_ptr<MultiFilter> mFilterRight;
+    MultiFilter* mFilter[2];
 
     juce::AudioProcessorValueTreeState apvts;
 
