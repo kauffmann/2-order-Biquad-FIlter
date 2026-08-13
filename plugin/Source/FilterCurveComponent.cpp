@@ -141,7 +141,10 @@ float FilterCurveComponent::calculateMagnitudeAt(float frequency) const
 {
     // Use the shared coefficient cache to calculate magnitude
     // This is thread-safe and uses the same coefficients as the audio processing
-    return mCoefficients.calculateMagnitudeAt(frequency, mSampleRate);
+    // Get the sample rate from the coefficients themselves
+    auto coeffs = mCoefficients.get();
+    float sampleRate = static_cast<float>(coeffs.sampleRate);
+    return mCoefficients.calculateMagnitudeAt(frequency, sampleRate > 0 ? sampleRate : mSampleRate);
 }
 
 //==============================================================================
@@ -200,18 +203,16 @@ void FilterCurveComponent::generateCurvePath()
 //==============================================================================
 void FilterCurveComponent::timerCallback()
 {
-    if (mNeedsRepaint)
-    {
-        mNeedsRepaint = false;
-        generateCurvePath();
-    }
+    // Always regenerate curve on timer tick to ensure we have latest coefficients
+    // This is more reliable than parameter callbacks due to potential ordering issues
+    generateCurvePath();
 }
 
 //==============================================================================
 void FilterCurveComponent::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Flag for timer callback to regenerate curve on UI thread
-    mNeedsRepaint = true;
+    // Trigger immediate update on parameter change, but also rely on timer for continuous updates
+    generateCurvePath();
 }
 
 //==============================================================================

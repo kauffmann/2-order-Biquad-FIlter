@@ -121,6 +121,7 @@ void FilterAudioProcessor::changeProgramName (int index, const juce::String& new
 //==============================================================================
 void FilterAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    mCurrentSampleRate = sampleRate;
     
     mFilter[0]->setSamplingRate(sampleRate);
     mFilter[1]->setSamplingRate(sampleRate);
@@ -298,9 +299,8 @@ void FilterAudioProcessor::parameterChanged(const juce::String& parameterID, flo
     float filterType = filterParam->getValue();
     
     // Update the shared coefficient cache
-    // Note: We use the last known sample rate (from prepareToPlay)
-    // This will be set to a default value initially and updated when prepareToPlay is called
-    mFilterCoefficients.update(mFilter[0]->getSamplingRate(), cutoff, resonance, gain, static_cast<int>(filterType));
+    // Note: We use the cached sample rate which is set in prepareToPlay
+    mFilterCoefficients.update(mCurrentSampleRate, cutoff, resonance, gain, static_cast<int>(filterType));
     
     // Also update the per-channel smoothed cutoff values in each filter
     mFilter[0]->setCutoffFrequency(cutoff);

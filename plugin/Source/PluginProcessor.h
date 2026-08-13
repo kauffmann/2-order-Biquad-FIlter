@@ -101,6 +101,9 @@ private:
 
     // UI resize parameter
     double mResizeFactor{ 1.2 };
+    
+    // Current sample rate (cached for coefficient updates)
+    double mCurrentSampleRate{ 44100.0 };
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FilterAudioProcessor)

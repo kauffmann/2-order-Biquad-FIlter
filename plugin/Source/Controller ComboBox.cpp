@@ -17,8 +17,7 @@ ControllerComboBox::~ControllerComboBox() { removeListener(this); }
 void ControllerComboBox::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
 
-    //isComboBoxTouchedByUser = true;
-    DBG("Hello from box");
+    //Nothing here...so why have it?
     
 
 }
