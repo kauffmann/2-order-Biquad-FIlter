@@ -32,10 +32,17 @@ juce::AudioProcessorValueTreeState::ParameterLayout FilterParameterLayout::creat
     // Add resonance parameter (Q factor)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"RESONANCE", versionHint},
         "Resonance",
-        juce::NormalisableRange<float>(0.1f, 7.0f, 0.01f),
-        0.707f)); // default: 0.707 (Butterworth Q)
+        juce::NormalisableRange<float>(0.707f, 7.0f, 0.01f),
+        0.707f, juce::String(), juce::AudioProcessorParameter::genericParameter,
+        [](float value, int) -> juce::String
+        {
+            juce::String valueToText =
+                juce::String(value, 1) + "";
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"GAIN", versionHint}, "Shelf Gain", juce::NormalisableRange<float>(-12.0f, 12.0f, 1.0f), 0.0f));
+            return valueToText;
+        })); // default: 0.707 (Butterworth Q)
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"GAIN", versionHint}, "Shelf Gain", juce::NormalisableRange<float>(-24.0f, 24.0f, 1.0f), 0.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"FILTER", versionHint}, "Filter Type",
         juce::StringArray{ "LowPass", "HighPass", "BPF", "Notch", "HighShelf", "LowShelf" }, 0));

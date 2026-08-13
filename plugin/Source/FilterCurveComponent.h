@@ -10,7 +10,6 @@
 
 #include <JuceHeader.h>
 #include <vector>
-#include "FilterCoefficients.h"
 
 class FilterAudioProcessor;
 
@@ -25,12 +24,8 @@ class FilterCurveComponent : public juce::Component,
 {
 public:
     //==============================================================================
-    /** Constructor
-     * 
-     * @param processor      Reference to the audio processor
-     * @param coefficients   Reference to the shared FilterCoefficients cache
-     */
-    FilterCurveComponent(FilterAudioProcessor& processor, FilterCoefficients& coefficients);
+    /** Constructor */
+    FilterCurveComponent(FilterAudioProcessor& processor);
     
     /** Destructor */
     ~FilterCurveComponent() override;
@@ -46,9 +41,15 @@ public:
 private:
     //==============================================================================
     FilterAudioProcessor& mProcessor;
-    FilterCoefficients& mCoefficients;  // Reference to shared coefficient cache
     juce::Path mCurvePath;
     float mSampleRate;
+    
+    // Cached parameters for efficient redrawing
+
+    std::atomic<float>* mCutoffFreq;
+    std::atomic<float>* mResonance;
+    std::atomic<float>* mGain;
+    std::atomic<float>* mFilterType;
     
     // Store curve points for fill path generation
     std::vector<juce::Point<float>> mCurvePoints;
@@ -64,7 +65,7 @@ private:
     static constexpr int NUM_POINTS = 300;
 
     //==============================================================================
-    /** Calculate magnitude response at a given frequency using shared coefficients. */
+    /** Calculate magnitude response at a given frequency */
     float calculateMagnitudeAt(float frequency) const;
     
     /** Generate the curve path based on current filter parameters */
@@ -79,7 +80,9 @@ private:
     //==============================================================================
     /** Called when a parameter changes */
     void parameterChanged(const juce::String& parameterID, float newValue) override;
+    
 
+    
     /** Update sample rate and regenerate curve */
     void setSampleRate(float sampleRate);
 

@@ -72,7 +72,6 @@ target_sources(${PROJECT_NAME}
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/PluginEditor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/FilterCurveComponent.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/FilterCurveComponent.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Source/FilterCoefficients.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/MultiFilter.h"
 )
 

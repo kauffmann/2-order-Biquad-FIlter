@@ -22,25 +22,16 @@ FilterAudioProcessor::FilterAudioProcessor()
                        ), apvts(*this, nullptr, "Parameters", mParameterLayout.createParameterLayout())
 #endif
 {
-    // Construct MultiFilter instances with FilterCoefficients reference
-    mFilterLeft = std::make_unique<MultiFilter>(mFilterCoefficients);
-    mFilterRight = std::make_unique<MultiFilter>(mFilterCoefficients);
-    mFilter[0] = mFilterLeft.get();
-    mFilter[1] = mFilterRight.get();
-    
     // Register the processor as a listener to the parameters
     apvts.addParameterListener("CUTOFF", this);
     apvts.addParameterListener("RESONANCE", this);
     apvts.addParameterListener("GAIN", this);
     apvts.addParameterListener("FILTER", this);
     
-    // Initialize FilterCoefficients with default values
-    mFilterCoefficients.update(44100.0, 1000.0, 0.707, 0.0, 0);
 }
 
 FilterAudioProcessor::~FilterAudioProcessor()
 {
-    // unique_ptr will automatically call destructors
     apvts.removeParameterListener("CUTOFF", this);
     apvts.removeParameterListener("RESONANCE", this);
     apvts.removeParameterListener("GAIN", this);
@@ -121,23 +112,9 @@ void FilterAudioProcessor::changeProgramName (int index, const juce::String& new
 //==============================================================================
 void FilterAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    mCurrentSampleRate = sampleRate;
     
-    mFilter[0]->setSamplingRate(sampleRate);
-    mFilter[1]->setSamplingRate(sampleRate);
-    
-    // Update the coefficient cache with the current parameters and new sample rate
-    auto* cutoffParam = apvts.getParameter("CUTOFF");
-    auto* resonanceParam = apvts.getParameter("RESONANCE");
-    auto* gainParam = apvts.getParameter("GAIN");
-    auto* filterParam = apvts.getParameter("FILTER");
-    
-    float cutoff = cutoffParam->getValue();
-    float resonance = resonanceParam->getValue();
-    float gain = gainParam->getValue();
-    float filterType = filterParam->getValue();
-    
-    mFilterCoefficients.update(sampleRate, cutoff, resonance, gain, static_cast<int>(filterType));
+    mFilter[0].setSamplingRate(sampleRate);
+    mFilter[1].setSamplingRate(sampleRate);
     
 }
 
@@ -191,7 +168,7 @@ void FilterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
       
         for (size_t i = 0; i < buffer.getNumSamples(); i++)
         {
-            mFilter[channel]->processSample(channelData[i]);
+            mFilter[channel].processSample(channelData[i]);
         }
 
     }
@@ -287,28 +264,27 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 
 void FilterAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
 {
-    // Get current values from APVTS for all parameters
-    auto* cutoffParam = apvts.getParameter("CUTOFF");
-    auto* resonanceParam = apvts.getParameter("RESONANCE");
-    auto* gainParam = apvts.getParameter("GAIN");
-    auto* filterParam = apvts.getParameter("FILTER");
-    
-    float cutoff = cutoffParam->getValue();
-    float resonance = resonanceParam->getValue();
-    float gain = gainParam->getValue();
-    float filterType = filterParam->getValue();
-    
-    // Update the shared coefficient cache
-    // Note: We use the cached sample rate which is set in prepareToPlay
-    mFilterCoefficients.update(mCurrentSampleRate, cutoff, resonance, gain, static_cast<int>(filterType));
-    
-    // Also update the per-channel smoothed cutoff values in each filter
-    mFilter[0]->setCutoffFrequency(cutoff);
-    mFilter[1]->setCutoffFrequency(cutoff);
-    mFilter[0]->setResonans(resonance);
-    mFilter[1]->setResonans(resonance);
-    mFilter[0]->setGain(gain);
-    mFilter[1]->setGain(gain);
-    mFilter[0]->setFilterType(static_cast<int>(filterType));
-    mFilter[1]->setFilterType(static_cast<int>(filterType));
+    if (parameterID == "CUTOFF")
+    {
+
+        mFilter[0].setCutoffFrequency(newValue);
+        mFilter[1].setCutoffFrequency(newValue);  
+    }
+    else if (parameterID == "RESONANCE")
+    {
+        mFilter[0].setResonans(newValue);
+        mFilter[1].setResonans(newValue);
+    }
+
+    else if (parameterID == "GAIN")
+    {
+        mFilter[0].setGain(newValue);
+        mFilter[1].setGain(newValue);
+    }
+
+    else if (parameterID == "FILTER")
+    {
+        mFilter[0].setFilterType(newValue);
+        mFilter[1].setFilterType(newValue);   
+    }
 }

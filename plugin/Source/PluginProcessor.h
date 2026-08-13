@@ -9,7 +9,6 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "FilterCoefficients.h"
 #include "MultiFilter.h"
 #include "ParameterLayout.h"
 
@@ -49,8 +48,6 @@ public:
     double getTailLengthSeconds() const override;
 
     juce::AudioProcessorValueTreeState& getApvts() { return apvts; }
-    
-    FilterCoefficients& getFilterCoefficients() { return mFilterCoefficients; }
 
     //==============================================================================
     int getNumPrograms() override;
@@ -75,13 +72,9 @@ public:
     }
 
 private:
-    // Shared coefficient cache - single source of truth for filter coefficients
-    FilterCoefficients mFilterCoefficients;
-    
-    // Filter instances - use unique_ptr to handle construction with FilterCoefficients reference
-    std::unique_ptr<MultiFilter> mFilterLeft;
-    std::unique_ptr<MultiFilter> mFilterRight;
-    MultiFilter* mFilter[2];
+    MultiFilter mFilterRight;
+    MultiFilter mFilterLeft;
+    MultiFilter mFilter[2]{ mFilterLeft, mFilterRight };
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -101,9 +94,6 @@ private:
 
     // UI resize parameter
     double mResizeFactor{ 1.2 };
-    
-    // Current sample rate (cached for coefficient updates)
-    double mCurrentSampleRate{ 44100.0 };
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FilterAudioProcessor)

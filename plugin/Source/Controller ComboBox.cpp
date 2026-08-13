@@ -16,10 +16,7 @@ ControllerComboBox::~ControllerComboBox() { removeListener(this); }
 
 void ControllerComboBox::comboBoxChanged (ComboBox* comboBoxThatHasChanged)
 {
-
-    //Nothing here...so why have it?
-    
-
+    // Do nothing
 }
 
 

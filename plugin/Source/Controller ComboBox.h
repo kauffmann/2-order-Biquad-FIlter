@@ -13,7 +13,7 @@ public:
 
 
     ControllerComboBox( juce::AudioProcessorValueTreeState& stateControl, const juce::String& parameterID);
-    ~ControllerComboBox() override;
+    ~ControllerComboBox();
 
     void comboBoxChanged (ComboBox* comboBoxThatHasChanged) override;
 

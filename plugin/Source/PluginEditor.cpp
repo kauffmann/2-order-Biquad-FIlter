@@ -17,7 +17,7 @@ PluginEditor::PluginEditor (FilterAudioProcessor& p)
       mResonanceSlider (p.getApvts(), "RESONANCE", "Resonance"),
       mGainSlider (p.getApvts(), "GAIN", "Self Gain"),
       mFilterComboBox(p.getApvts(),"FILTER"),
-      mFilterCurve(p, p.getFilterCoefficients())
+      mFilterCurve(p)
 {
     // Make sure that before the constructor has finished, you've set the
     // editor's size to whatever you need it to be.
@@ -133,7 +133,6 @@ void PluginEditor::resized()
 
 // Wrapper Editor implementation
 
-
 WrappedRasterAudioProcessorEditor::WrappedRasterAudioProcessorEditor(FilterAudioProcessor& p)
 : AudioProcessorEditor(p), rasterComponent(p), mProcessor(p)
 {
@@ -155,7 +154,6 @@ WrappedRasterAudioProcessorEditor::WrappedRasterAudioProcessorEditor(FilterAudio
     setResizable(true, true);
     setSize(static_cast<int> (originalWidth * sizeRatio), static_cast<int> (originalHeight * sizeRatio));
     
-
 
 }
 
