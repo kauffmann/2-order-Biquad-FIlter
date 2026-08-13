@@ -44,11 +44,13 @@ public:
         : coefficients(&coeffCache),
           smoothedCutoffFreq(1000.0)
     {
-        // Reset the smoothed value with proper sample rate and smoothing time
-        smoothedCutoffFreq.reset(44100.0, 0.05); // Smooth over 50 ms
-        
         // Initialize with default coefficients from cache
         resetToDefaultCoefficients();
+        
+        // Reset the smoothed value with proper sample rate and smoothing time
+        // Start from the current cutoff value
+        smoothedCutoffFreq.reset(samplingRate, 0.05); // Smooth over 50 ms
+        smoothedCutoffFreq.setCurrentAndTargetValue(currentCutoff);
     }
 
     void setSamplingRate(double sampleRate)
@@ -60,26 +62,28 @@ public:
     void setCutoffFrequency(float cutoffFreq)
     {
         smoothedCutoffFreq.setTargetValue(cutoffFreq);
-        currentCutoff = cutoffFreq;
     }
 
     void setResonans(float resonans)
     {
-        currentQ = resonans;
+        // No longer need to store locally - will use shared coefficients
     }
 
     void setGain(float gain)
     {
-        currentGainDB = gain;
+        // No longer need to store locally - will use shared coefficients
     }
 
     void setFilterType(int typeValue)
     {
-        currentFilterType = static_cast<FilterType>(typeValue);
+        // No longer need to store locally - will use shared coefficients
     }
 
     /** Get the current filter type as an integer. */
-    int getFilterType() const noexcept { return static_cast<int>(currentFilterType); }
+    int getFilterType() const noexcept { 
+        auto coeffs = coefficients->get();
+        return coeffs.filterType; 
+    }
 
     /** Get the current sampling rate. */
     double getSamplingRate() const noexcept { return samplingRate; }
@@ -131,10 +135,7 @@ private:
     
     // Local state for each filter instance (per-channel)
     double samplingRate = 44100.0;
-    double currentCutoff = 1000.0;  // Current cutoff (target or smoothed)
-    double currentQ = 0.707;         // Current Q factor
-    double currentGainDB = 0.0;      // Current gain in dB
-    FilterType currentFilterType = LowPass; // Current filter type
+    double currentCutoff = 1000.0;  // Current smoothed cutoff value
     
     // Local smoothed cutoff for per-channel smoothing
     juce::SmoothedValue<double> smoothedCutoffFreq;
@@ -156,28 +157,30 @@ private:
         b0 = coeffs.b0; b1 = coeffs.b1; b2 = coeffs.b2;
         a1 = coeffs.a1; a2 = coeffs.a2;
         currentCutoff = coeffs.cutoffFrequency;
-        currentQ = coeffs.Q;
-        currentGainDB = coeffs.gainDB;
-        currentFilterType = static_cast<FilterType>(coeffs.filterType);
         samplingRate = coeffs.sampleRate;
     }
 
     /** Update local coefficients when smoothing is active.
      * 
-     * This recalculates coefficients based on the current smoothed parameters.
+     * This recalculates coefficients based on the current smoothed cutoff,
+     * but uses the other parameters (Q, gain, filter type) from the shared coefficients
+     * to ensure consistency with the UI and other filter instances.
      * Note: This is only used when useSmoothing is true and smoothing is active.
      */
     void updateLocalCoefficients()
     {
+        // Get current parameters from shared coefficients for consistency
+        auto coeffs = coefficients->get();
         double omega = 2.0 * juce::MathConstants<double>::pi * currentCutoff / samplingRate;
-        double alpha = std::sin(omega) / (2.0 * currentQ);
+        double alpha = std::sin(omega) / (2.0 * coeffs.Q);
         double cos_omega = std::cos(omega);
-        double A = std::pow(10.0, currentGainDB / 40.0);
+        double A = std::pow(10.0, coeffs.gainDB / 40.0);
         
         double b0_temp = 1.0, b1_temp = 0.0, b2_temp = 0.0;
         double a0_temp = 1.0, a1_temp = 0.0, a2_temp = 0.0;
         
-        switch (currentFilterType)
+        // Use filter type from shared coefficients
+        switch (static_cast<FilterType>(coeffs.filterType))
         {
             case LowPass:
                 b0_temp = (1.0 - cos_omega) / 2.0;

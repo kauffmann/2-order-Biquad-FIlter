@@ -50,7 +50,7 @@ void FilterCurveComponent::paint(juce::Graphics& g)
     auto bounds = getLocalBounds().toFloat();
     float width = static_cast<float>(bounds.getWidth());
     float height = static_cast<float>(bounds.getHeight());
-
+DBG("Vector size is: " << mCurvePoints[2].getX() );
     // Don't draw if we have fewer than 2 points
     if (mCurvePoints.size() < 2 )
         return;
