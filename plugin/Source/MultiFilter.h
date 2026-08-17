@@ -29,6 +29,10 @@
     juce::SmoothedValue, computes coefficients, and publishes them. This prevents
     message-thread publication of unsmoothed coefficients and avoids audio pops.
 
+  - Optimization (Option A): recompute & publish only when parameter changes exceed
+    small thresholds, and ensure coefficients are published at block start to keep
+    UI and audio in sync.
+
   References:
   - RBJ Audio EQ Cookbook: https://www.w3.org/TR/audio-eq-cookbook/
   - std::atomic (acquire/release semantics): https://en.cppreference.com/w/cpp/atomic/atomic
@@ -79,6 +83,12 @@ public:
 
         smoothedCutoff.reset(samplingRate, 0.05);
         smoothedCutoff.setCurrentAndTargetValue(cutoffFrequency);
+
+        // initialize published state mirrors
+        lastPublishedCutoff = cutoffFrequency;
+        lastPublishedQ = Q;
+        lastPublishedGain = gainDB;
+        lastPublishedType = static_cast<int>(filterType);
     }
 
     // Public setters: only publish targets to atomics. Audio thread will consume.
@@ -110,6 +120,40 @@ public:
         mTargetFilterType.store(typeValue, std::memory_order_relaxed);
     }
 
+    // Called at block start by the host thread (via processBlock) to ensure a
+    // coefficient snapshot is available for the upcoming block (keeps UI & audio in sync).
+    void ensureCoefficientsPublishedForBlock()
+    {
+        // Read parameter targets and update internal state accordingly (non-smoothing for Q/gain/type)
+        double targetCut = mTargetCutoff.load(std::memory_order_relaxed);
+        smoothedCutoff.setTargetValue(targetCut);
+
+        double currentCut = smoothedCutoff.getCurrentValue();
+        // Update Q/gain/type from targets so compute uses latest values
+        double targetQ = mTargetQ.load(std::memory_order_relaxed);
+        if (std::abs(targetQ - Q) > 1e-12)
+            Q = targetQ;
+
+        double targetGain = mTargetGain.load(std::memory_order_relaxed);
+        if (std::abs(targetGain - static_cast<double>(gainDB)) > 1e-12)
+            gainDB = static_cast<float>(targetGain);
+
+        int targetType = mTargetFilterType.load(std::memory_order_relaxed);
+        if (targetType != static_cast<int>(filterType))
+            filterType = static_cast<FilterType>(targetType);
+
+        // Decide whether to publish based on thresholds
+        if (std::abs(currentCut - lastPublishedCutoff) > cutoffEpsilon
+            || std::abs(Q - lastPublishedQ) > paramEpsilon
+            || std::abs(static_cast<double>(gainDB) - lastPublishedGain) > paramEpsilon
+            || targetType != lastPublishedType)
+        {
+            // Sync cutoffFrequency to current value used for computation
+            cutoffFrequency = currentCut;
+            computeAndPublishCoefficients();
+        }
+    }
+
     // Process a single sample (audio thread). This is where smoothing and
     // coefficient publishing happen. Real-time safe: no locks, no allocations.
     void processSample(float& input)
@@ -117,22 +161,20 @@ public:
         // 1) Consume parameter targets and update internal state as needed.
         bool needRecompute = false;
 
-        // Cutoff: drive the smoothed value from audio thread using target stored atomically
+        // Cutoff: advance smoothing one step on audio thread
         double targetCut = mTargetCutoff.load(std::memory_order_relaxed);
-        // If target differs from current target of smoothedCutoff, set it on audio thread
         smoothedCutoff.setTargetValue(targetCut);
 
         if (smoothedCutoff.isSmoothing())
         {
             cutoffFrequency = smoothedCutoff.getNextValue();
-            needRecompute = true;
+            if (std::abs(cutoffFrequency - lastPublishedCutoff) > cutoffEpsilon)
+                needRecompute = true;
         }
         else
         {
-            // Even if not smoothing, ensure current cutoff matches the target if different
-            double currentCut = cutoffFrequency;
             double next = smoothedCutoff.getCurrentValue();
-            if (std::abs(next - currentCut) > 1e-9)
+            if (std::abs(next - lastPublishedCutoff) > cutoffEpsilon)
             {
                 cutoffFrequency = next;
                 needRecompute = true;
@@ -144,7 +186,8 @@ public:
         if (std::abs(targetQ - Q) > 1e-12)
         {
             Q = targetQ;
-            needRecompute = true;
+            if (std::abs(Q - lastPublishedQ) > paramEpsilon)
+                needRecompute = true;
         }
 
         // Gain
@@ -152,7 +195,8 @@ public:
         if (std::abs(targetGain - static_cast<double>(gainDB)) > 1e-12)
         {
             gainDB = static_cast<float>(targetGain);
-            needRecompute = true;
+            if (std::abs(static_cast<double>(gainDB) - lastPublishedGain) > paramEpsilon)
+                needRecompute = true;
         }
 
         // Filter type
@@ -160,7 +204,8 @@ public:
         if (targetType != static_cast<int>(filterType))
         {
             filterType = static_cast<FilterType>(targetType);
-            needRecompute = true;
+            if (targetType != lastPublishedType)
+                needRecompute = true;
         }
 
         // Recompute and publish coefficients if needed (audio thread)
@@ -215,6 +260,16 @@ private:
     std::atomic<double> mTargetQ{0.707};
     std::atomic<double> mTargetGain{0.0};
     std::atomic<int>    mTargetFilterType{static_cast<int>(FilterType::LowPass)};
+
+    // last published parameter mirrors (to avoid excessive republishes)
+    double lastPublishedCutoff{0.0};
+    double lastPublishedQ{0.0};
+    double lastPublishedGain{0.0};
+    int    lastPublishedType{0};
+
+    // thresholds
+    static constexpr double cutoffEpsilon = 0.01; // Hz
+    static constexpr double paramEpsilon = 1e-6;  
 
     // Registers: previous input/output samples
     double prevX1{0.0}, prevX2{0.0}, prevY1{0.0}, prevY2{0.0};
@@ -317,6 +372,12 @@ private:
 
         // Ensure published buffer is visible before flipping
         activeCoeffBuffer.store(inactive, std::memory_order_release);
+
+        // update last published mirrors
+        lastPublishedCutoff = cutoffFrequency;
+        lastPublishedQ = Q;
+        lastPublishedGain = static_cast<double>(gainDB);
+        lastPublishedType = static_cast<int>(filterType);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MultiFilter)
