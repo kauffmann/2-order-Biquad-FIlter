@@ -62,6 +62,10 @@ PluginEditor::PluginEditor (FilterAudioProcessor& p)
     filterLabel.setInterceptsMouseClicks(false, false);
     filterLabel.setFont(customLookAndFeel.getSliderLabelFont());
     addAndMakeVisible(filterLabel);
+
+    mLogo = juce::ImageCache::getFromMemory (BinaryData::Logo_png , BinaryData::Logo_pngSize);
+
+
 }
 
 PluginEditor::~PluginEditor()
@@ -79,6 +83,9 @@ void PluginEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.setFont (15.0f);
     //g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
+
+    if (mLogo.isValid())
+        g.drawImageWithin(mLogo, 354,269, mLogo.getWidth() / 2, mLogo.getHeight() / 2, juce::RectanglePlacement::stretchToFit);
 }
 
 void PluginEditor::resized()

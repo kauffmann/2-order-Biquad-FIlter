@@ -10,8 +10,11 @@
 
 #include <JuceHeader.h>
 #include <vector>
+#include "PluginProcessor.h"
+#include "MultiFilter.h"
+#include <cmath>
 
-class FilterAudioProcessor;
+//class FilterAudioProcessor;
 
 //==============================================================================
 /**

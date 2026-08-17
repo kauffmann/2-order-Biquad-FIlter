@@ -32,12 +32,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout FilterParameterLayout::creat
     // Add resonance parameter (Q factor)
     params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"RESONANCE", versionHint},
         "Resonance",
-        juce::NormalisableRange<float>(0.707f, 7.0f, 0.01f),
+        juce::NormalisableRange<float>(0.707f, 10.707f, 0.01f),
         0.707f, juce::String(), juce::AudioProcessorParameter::genericParameter,
         [](float value, int) -> juce::String
         {
             juce::String valueToText =
-                juce::String(value, 1) + "";
+                juce::String((value -0.707) * 10, 1) + " %";
 
             return valueToText;
         })); // default: 0.707 (Butterworth Q)

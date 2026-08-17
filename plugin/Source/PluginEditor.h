@@ -52,6 +52,8 @@ private:
     // Filter curve visualization
     FilterCurveComponent mFilterCurve;
 
+    juce::Image mLogo;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };
 

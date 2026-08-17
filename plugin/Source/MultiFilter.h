@@ -39,8 +39,8 @@ public:
         HighShelf,
         LowShelf
     };
-
-    MultiFilter() : a0(1.0), a1(0.0), a2(0.0), b1(0.0), b2(0.0), prevX1(0.0), prevX2(0.0), prevY1(0.0), prevY2(0.0)
+    // b0 was not init, so init to 1.0   why ??
+    MultiFilter() : a0(1.0), a1(0.0), a2(0.0), b0(1.0), b1(0.0), b2(0.0), prevX1(0.0), prevX2(0.0), prevY1(0.0), prevY2(0.0)
     {}
 
     void setSamplingRate(double sampleRate)
@@ -210,7 +210,8 @@ private:
         a2 /= a0;
 
 
-
+        // could put coefficients in member vector, that can be returned by public getCoefficients(), used by FilterCurveComponent
+        // that access Filter from PluginProcessor, needs a get reference to filter
         
        
     }

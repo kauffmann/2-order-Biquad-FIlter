@@ -7,9 +7,7 @@
 */
 
 #include "FilterCurveComponent.h"
-#include "PluginProcessor.h"
-#include "MultiFilter.h"
-#include <cmath>
+
 
 //==============================================================================
 FilterCurveComponent::FilterCurveComponent(FilterAudioProcessor& processor)
