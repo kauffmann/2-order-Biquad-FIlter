@@ -153,111 +153,17 @@ float FilterCurveComponent::magToY(float magnitudeDB, float height) const
 float FilterCurveComponent::calculateMagnitudeAt(float frequency) const
 {
 
-    // Create a temporary MultiFilter to calculate response
-    MultiFilter tempFilter;
-    tempFilter.setSamplingRate(static_cast<double>(mSampleRate));
+    // Get coefficients from processor's filter (single source of truth)
+    auto coeffs = mProcessor.getFilterCoefficients(0);
 
-    // Set filter parameters with safety clamping
-    float cutoff = std::max(20.0f, mCutoffFreq->load());
-    float resonance = std::max(0.1f, std::min(mResonance->load(), 20.0f));
-    float gain = std::max(-24.0f, std::min(mGain->load(), 24.0f));
-    int filterType = static_cast<int>( mFilterType->load());
+    // Map coefficients using MultiFilter::CoeffIndex enum
+    double b0 = coeffs[MultiFilter::B0];
+    double b1 = coeffs[MultiFilter::B1];
+    double b2 = coeffs[MultiFilter::B2];
+    double a1 = coeffs[MultiFilter::A1];
+    double a2 = coeffs[MultiFilter::A2];
     
-    tempFilter.setCutoffFrequency(cutoff);
-    tempFilter.setResonans(resonance);
-    tempFilter.setGain(gain);
-    tempFilter.setFilterType(filterType);
-    
-    // Get the filter coefficients (we need to access them)
-    // Since MultiFilter doesn't have getters, we'll use the formulas directly
-    // This is a workaround - in a better design, MultiFilter would expose getters
-
-    // Calculate coefficients based on current parameters
-    double omega = 2.0 * juce::MathConstants<double>::pi * cutoff / mSampleRate;
-    double alpha = std::sin(omega) / (2.0 * resonance);
-    double cos_omega = std::cos(omega);
-    
-    double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
-
-
-
-    MultiFilter::FilterType filterTypeEnum = static_cast<MultiFilter::FilterType>(filterType);
-
-
-    switch (filterTypeEnum)
-    {
-        case MultiFilter::LowPass:
-            b0 = (1.0 - cos_omega) / 2.0;
-            b1 = 1.0 - cos_omega;
-            b2 = (1.0 - cos_omega) / 2.0;
-            a0 = 1.0 + alpha;
-            a1 = -2.0 * cos_omega;
-            a2 = 1.0 - alpha;
-            break;
-            
-        case MultiFilter::HighPass:
-            b0 = (1.0 + cos_omega) / 2.0;
-            b1 = -(1.0 + cos_omega);
-            b2 = (1.0 + cos_omega) / 2.0;
-            a0 = 1.0 + alpha;
-            a1 = -2.0 * cos_omega;
-            a2 = 1.0 - alpha;
-            break;
-            
-        case MultiFilter::BandPass:
-            b0 = alpha;
-            b1 = 0.0;
-            b2 = -alpha;
-            a0 = 1.0 + alpha;
-            a1 = -2.0 * cos_omega;
-            a2 = 1.0 - alpha;
-            break;
-            
-        case MultiFilter::Notch:
-            b0 = 1.0;
-            b1 = -2.0 * cos_omega;
-            b2 = 1.0;
-            a0 = 1.0 + alpha;
-            a1 = -2.0 * cos_omega;
-            a2 = 1.0 - alpha;
-            break;
-            
-        case MultiFilter::LowShelf:
-        {
-            double A = std::pow(10.0, gain / 40.0);
-            b0 = A * ((A + 1.0) - (A - 1.0) * cos_omega + 2.0 * std::sqrt(A) * alpha);
-            b1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cos_omega);
-            b2 = A * ((A + 1.0) - (A - 1.0) * cos_omega - 2.0 * std::sqrt(A) * alpha);
-            a0 = (A + 1.0) + (A - 1.0) * cos_omega + 2.0 * std::sqrt(A) * alpha;
-            a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cos_omega);
-            a2 = (A + 1.0) + (A - 1.0) * cos_omega - 2.0 * std::sqrt(A) * alpha;
-        }
-        break;
-            
-        case MultiFilter::HighShelf:
-        {
-            double A = std::pow(10.0, gain / 40.0);
-            b0 = A * ((A + 1.0) + (A - 1.0) * cos_omega + 2.0 * std::sqrt(A) * alpha);
-            b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cos_omega);
-            b2 = A * ((A + 1.0) + (A - 1.0) * cos_omega - 2.0 * std::sqrt(A) * alpha);
-            a0 = (A + 1.0) - (A - 1.0) * cos_omega + 2.0 * std::sqrt(A) * alpha;
-            a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cos_omega);
-            a2 = (A + 1.0) - (A - 1.0) * cos_omega - 2.0 * std::sqrt(A) * alpha;
-        }
-        break;
-            
-        default:
-            return 0.0f;
-    }
-    
-    // Normalize coefficients by a0
-    b0 /= a0;
-    b1 /= a0;
-    b2 /= a0;
-    a1 /= a0;
-    a2 /= a0;
-    
-    // Calculate omega for this frequency
+    // Calculate omega for this frequency using component's sample rate
     double testOmega = 2.0 * juce::MathConstants<double>::pi * frequency / mSampleRate;
     
     // Calculate magnitude response
@@ -333,93 +239,6 @@ void FilterCurveComponent::generateCurvePath()
         }
     }
 
-    // Add flat stopband extensions based on filter type
-    // For LowPass: extend right edge horizontally at stopband level
-    // For HighPass: extend left edge horizontally at stopband level
-    // For others: extend both sides appropriately
-
-    const float stopbandY = height; // Bottom of component (MIN_DB maps to height)
-    //   HAS NO EFFECT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // switch (filterTypeEnum)
-    // {
-    //     case MultiFilter::LowPass:
-    //     case MultiFilter::LowShelf:
-    //     {
-    //         // For low filters: extend from last point horizontally to right edge at its y-level
-    //         // This creates the flat stopband on the right
-    //         float lastX = mCurvePoints.back().x;
-    //         float lastY = mCurvePoints.back().y;
-    //
-    //         if (lastX < width)
-    //         {
-    //             mCurvePath.lineTo(width, lastY);
-    //             mCurvePoints.emplace_back(width, lastY);
-    //
-    //         }
-    //         break;
-    //     }
-    //
-    //     case MultiFilter::HighPass:
-    //     case MultiFilter::HighShelf:
-    //     {
-    //         // For high filters: extend from first point horizontally to left edge at its y-level
-    //         // This creates the flat stopband on the left
-    //         float firstX = mCurvePoints.front().x;
-    //         float firstY = mCurvePoints.front().y;
-    //         if (firstX > 0)
-    //         {
-    //             mCurvePath.lineTo(0, firstY);
-    //             mCurvePoints.insert(mCurvePoints.begin(), juce::Point<float>(0, firstY));
-    //         }
-    //         break;
-    //     }
-    //
-    //     case MultiFilter::BandPass:
-    //     {
-    //         // For bandpass: extend both sides
-    //         // Left side: extend first point to left edge at its y-level
-    //         float firstX = mCurvePoints.front().x;
-    //         float firstY = mCurvePoints.front().y;
-    //         if (firstX > 0)
-    //         {
-    //             mCurvePath.lineTo(0, firstY);
-    //             mCurvePoints.insert(mCurvePoints.begin(), juce::Point<float>(0, firstY));
-    //         }
-    //         // Right side: extend last point to right edge at its y-level
-    //         float lastX = mCurvePoints.back().x;
-    //         float lastY = mCurvePoints.back().y;
-    //         if (lastX < width)
-    //         {
-    //             mCurvePath.lineTo(width, lastY);
-    //             mCurvePoints.emplace_back(width, lastY);
-    //         }
-    //         break;
-    //     }
-    //
-    //     case MultiFilter::Notch:
-    //     {
-    //         // For notch: the curve naturally has dips, extend both sides
-    //         float firstX = mCurvePoints.front().x;
-    //         float firstY = mCurvePoints.front().y;
-    //         if (firstX > 0)
-    //         {
-    //             mCurvePath.lineTo(0, firstY);
-    //             mCurvePoints.insert(mCurvePoints.begin(), juce::Point<float>(0, firstY));
-    //         }
-    //         float lastX = mCurvePoints.back().x;
-    //         float lastY = mCurvePoints.back().y;
-    //         if (lastX < width)
-    //         {
-    //             mCurvePath.lineTo(width, lastY);
-    //             mCurvePoints.emplace_back(width, lastY);
-    //         }
-    //         break;
-    //     }
-    //
-    //     default:
-    //         break;
-    // }
-
     // Request repaint
     repaint();
 }
@@ -438,7 +257,6 @@ void FilterCurveComponent::timerCallback()
 }
 
 
-
 // DEBUG state: use atomic instead - works, except combobox, who gets default 0 regardless of saved value..
 //==============================================================================
 void FilterCurveComponent::parameterChanged(const juce::String& parameterID, float newValue)
@@ -446,7 +264,6 @@ void FilterCurveComponent::parameterChanged(const juce::String& parameterID, flo
     // Flag for timer callback to regenerate curve on UI thread
         mNeedsRepaint = true;
 }
-
 
 
 

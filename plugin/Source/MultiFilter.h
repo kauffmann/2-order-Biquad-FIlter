@@ -13,6 +13,8 @@
 
 
 #include <JuceHeader.h>
+#include <atomic>
+#include <array>
 
 /* Use: 
    
@@ -23,7 +25,6 @@
    
    2. If parameters change, the Filter must always call updateCoefficients() before processing.
    */
-
    
 
 
@@ -39,9 +40,28 @@ public:
         HighShelf,
         LowShelf
     };
+
+    // Coefficient indices for readable access
+    enum CoeffIndex
+    {
+        B0 = 0,
+        B1 = 1,
+        B2 = 2,
+        A0 = 3,
+        A1 = 4,
+        A2 = 5,
+        COEFF_COUNT = 6
+    };
+
     // b0 was not init, so init to 1.0   why ??
-    MultiFilter() : a0(1.0), a1(0.0), a2(0.0), b0(1.0), b1(0.0), b2(0.0), prevX1(0.0), prevX2(0.0), prevY1(0.0), prevY2(0.0)
-    {}
+    MultiFilter() : prevX1(0.0), prevX2(0.0), prevY1(0.0), prevY2(0.0)
+    {
+        // Initialize atomics to sensible defaults (unity gain)
+        for (int i = 0; i < COEFF_COUNT; ++i)
+            mCoeffs[i].store(0.0);
+        mCoeffs[B0].store(1.0);
+        mCoeffs[A0].store(1.0);
+    }
 
     void setSamplingRate(double sampleRate)
     {
@@ -87,6 +107,13 @@ public:
             updateCoefficients();
         }
 
+        // Load coefficients once (atomic loads) to local doubles for faster access in inner loop
+        double b0 = mCoeffs[B0].load(std::memory_order_relaxed);
+        double b1 = mCoeffs[B1].load(std::memory_order_relaxed);
+        double b2 = mCoeffs[B2].load(std::memory_order_relaxed);
+        double a1 = mCoeffs[A1].load(std::memory_order_relaxed);
+        double a2 = mCoeffs[A2].load(std::memory_order_relaxed);
+
         // Implementing the Biquad IIR filter equation. Is recursive as each iteration  store current levels in register and are recalled in next iteration. 
         // it is second order filter, as it uses 2 z^-1 delay blocks. A serie of difference equations. Kind of convolution, without flip and frame.
         
@@ -103,6 +130,15 @@ public:
         
     }
 
+    // Return a snapshot of the current coefficients (atomic loads)
+    std::array<double, COEFF_COUNT> getCoefficients() const
+    {
+        std::array<double, COEFF_COUNT> out;
+        for (int i = 0; i < COEFF_COUNT; ++i)
+            out[i] = mCoeffs[i].load(std::memory_order_relaxed);
+        return out;
+    }
+
 private:
     
 
@@ -113,8 +149,8 @@ private:
     float gainDB = 0.0;
     FilterType filterType = LowPass; // Default filter type
 
-    // Filter coefficients
-    double a0, a1, a2, b0, b1, b2;
+    // Filter coefficients stored atomically to allow lock-free cross-thread reads
+    mutable std::array<std::atomic<double>, COEFF_COUNT> mCoeffs;
 
     // Registers: previous input/output samples
     double prevX1, prevX2, prevY1, prevY2;
@@ -133,6 +169,8 @@ private:
         double omega = 2.0 * juce::MathConstants<double>::pi * cutoffFrequency / samplingRate;
         double alpha = sin(omega) / (2.0 * Q);
         double cos_omega = cos(omega);
+
+        double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
 
         switch (filterType)
         {                                         
@@ -203,21 +241,24 @@ private:
 
 
         // Normalize coefficients by a0
-        b0 /= a0;
-        b1 /= a0;
-        b2 /= a0;
-        a1 /= a0;
-        a2 /= a0;
+        double nb0 = b0 / a0;
+        double nb1 = b1 / a0;
+        double nb2 = b2 / a0;
+        double na1 = a1 / a0;
+        double na2 = a2 / a0;
 
+        // Publish the coefficients atomically. We use relaxed ordering for performance; this is sufficient
+        // for the UI which can tolerate transient inconsistencies for a single frame.
+        mCoeffs[B0].store(nb0, std::memory_order_relaxed);
+        mCoeffs[B1].store(nb1, std::memory_order_relaxed);
+        mCoeffs[B2].store(nb2, std::memory_order_relaxed);
+        mCoeffs[A0].store(a0, std::memory_order_relaxed); // raw a0 kept for completeness
+        mCoeffs[A1].store(na1, std::memory_order_relaxed);
+        mCoeffs[A2].store(na2, std::memory_order_relaxed);
 
-        // could put coefficients in member vector, that can be returned by public getCoefficients(), used by FilterCurveComponent
-        // that access Filter from PluginProcessor, needs a get reference to filter
         
-       
     }
-
 
    
 
 };
-
