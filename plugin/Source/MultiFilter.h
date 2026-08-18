@@ -23,7 +23,6 @@
    
    2. If parameters change, the Filter must always call updateCoefficients() before processing.
    */
-
    
 
 
@@ -39,22 +38,32 @@ public:
         HighShelf,
         LowShelf
     };
-    // b0 was not init, so init to 1.0   why ??
+    // Initialize coefficients and state
     MultiFilter() : a0(1.0), a1(0.0), a2(0.0), b0(1.0), b1(0.0), b2(0.0), prevX1(0.0), prevX2(0.0), prevY1(0.0), prevY2(0.0)
     {}
 
     void setSamplingRate(double sampleRate)
     {
         samplingRate = sampleRate;
+
+        // Reset smoothing with the audio sample rate and a 50ms smoothing time
         smoothedCutoffFreq.reset(samplingRate, 0.05); // Smooth over 50 ms
+
+        // Ensure the smoothed value starts at the current cutoffFrequency to avoid jumps
+        smoothedCutoffFreq.setCurrentAndTargetValue(cutoffFrequency);
+
+        // Recalculate coefficients for the initial state
         updateCoefficients();
     }
 
     void setCutoffFrequency(float cutoffFreq)
     {
-        smoothedCutoffFreq.setTargetValue(cutoffFreq);
-        cutoffFrequency = cutoffFreq;
-        updateCoefficients();
+        // Only set the target value on the SmoothedValue. Do NOT immediately set
+        // cutoffFrequency or call updateCoefficients() from the message/UI thread.
+        // The audio thread will read the smoothed values in processSample() and
+        // update coefficients there. This prevents abrupt coefficient changes that
+        // cause audible clicks/pops when the user first moves the slider.
+        smoothedCutoffFreq.setTargetValue(static_cast<double>(cutoffFreq));
     }
 
 
@@ -80,37 +89,35 @@ public:
 
     void processSample(float& input)
     {
-        // Smooth the cutoff frequency and update coefficients only if there is a change.
-        if (smoothedCutoffFreq.isSmoothing())
+        // Always advance the smoothed value per-sample. If no smoothing is active
+        // getNextValue() simply returns the same value. This is real-time safe.
+        double newCutoff = smoothedCutoffFreq.getNextValue();
+
+        // If cutoff actually changed, update the internal cutoff and recalc coeffs
+        if (newCutoff != cutoffFrequency)
         {
-            cutoffFrequency = smoothedCutoffFreq.getNextValue();
+            cutoffFrequency = newCutoff;
             updateCoefficients();
         }
 
-        // Implementing the Biquad IIR filter equation. Is recursive as each iteration  store current levels in register and are recalled in next iteration. 
-        // it is second order filter, as it uses 2 z^-1 delay blocks. A serie of difference equations. Kind of convolution, without flip and frame.
-        
-                      // feedforward                          // feedbackward. substract to avoid unstable filter.
+        // Biquad IIR filter equation
         double output = b0 * input + b1 * prevX1 + b2 * prevX2 - a1 * prevY1 - a2 * prevY2;
 
-        // Update previous register samples. A Biqard filter diagram/image support this.
-        prevX2 = prevX1;   // 2 step put x1 in register
-        prevX1 = input;   // 1 step put input in register
-        prevY2 = prevY1;   // 2 step put y1 in register
-        prevY1 = output;   // 1 step put output in register
+        // Update previous samples
+        prevX2 = prevX1;
+        prevX1 = input;
+        prevY2 = prevY1;
+        prevY1 = output;
 
         input = static_cast<float>(output);
-        
     }
 
 private:
-    
-
     double samplingRate = 44100.0; 
     double cutoffFrequency = 1000.0; 
     double Q = 0.707; // Default quality factor
 
-    float gainDB = 0.0;
+    float gainDB = 0.0f;
     FilterType filterType = LowPass; // Default filter type
 
     // Filter coefficients
@@ -123,16 +130,10 @@ private:
 
     void updateCoefficients()
     {
-        
-
-        // Formulas from the Biquad Cookbook.  Adapted from Audio-EQ-Cookbook.txt, by Robert Bristow-Johnson https://www.w3.org/TR/audio-eq-cookbook/#formulae
-        // https://github.com/shepazu/Audio-EQ-Cookbook/blob/master/Audio-EQ-Cookbook.txt
-
-        //  Omega or greek w represents a frequency in terms of angular measure (in radians).  
-
+        // Formulas from the Biquad Cookbook: https://www.w3.org/TR/audio-eq-cookbook/
         double omega = 2.0 * juce::MathConstants<double>::pi * cutoffFrequency / samplingRate;
-        double alpha = sin(omega) / (2.0 * Q);
-        double cos_omega = cos(omega);
+        double alpha = std::sin(omega) / (2.0 * Q);
+        double cos_omega = std::cos(omega);
 
         switch (filterType)
         {                                         
@@ -174,33 +175,31 @@ private:
 
         case LowShelf:
         {
-            double A = pow(10, gainDB / 40.0);
-            b0 = A * ((A + 1) - (A - 1) * cos_omega + 2 * std::sqrt(A) * alpha);
-            b1 = 2 * A * ((A - 1) - (A + 1) * cos_omega);
-            b2 = A * ((A + 1) - (A - 1) * cos_omega - 2 * std::sqrt(A) * alpha);
-            a0 = (A + 1) + (A - 1) * cos_omega + 2 * std::sqrt(A) * alpha;
-            a1 = -2 * ((A - 1) + (A + 1) * cos_omega);
-            a2 = (A + 1) + (A - 1) * cos_omega - 2 * std::sqrt(A) * alpha;
+            double A = std::pow(10.0, gainDB / 40.0);
+            b0 = A * ((A + 1) - (A - 1) * cos_omega + 2.0 * std::sqrt(A) * alpha);
+            b1 = 2.0 * A * ((A - 1) - (A + 1) * cos_omega);
+            b2 = A * ((A + 1) - (A - 1) * cos_omega - 2.0 * std::sqrt(A) * alpha);
+            a0 = (A + 1) + (A - 1) * cos_omega + 2.0 * std::sqrt(A) * alpha;
+            a1 = -2.0 * ((A - 1) + (A + 1) * cos_omega);
+            a2 = (A + 1) + (A - 1) * cos_omega - 2.0 * std::sqrt(A) * alpha;
         }
         break;
 
         case HighShelf:
         {
-            double A = pow(10, gainDB / 40.0);
-            b0 = A * ((A + 1) + (A - 1) * cos_omega + 2 * std::sqrt(A) * alpha);
-            b1 = -2 * A * ((A - 1) + (A + 1) * cos_omega);
-            b2 = A * ((A + 1) + (A - 1) * cos_omega - 2 * std::sqrt(A) * alpha);
-            a0 = (A + 1) - (A - 1) * cos_omega + 2 * std::sqrt(A) * alpha;
-            a1 = 2 * ((A - 1) - (A + 1) * cos_omega);
-            a2 = (A + 1) - (A - 1) * cos_omega - 2 * std::sqrt(A) * alpha;
+            double A = std::pow(10.0, gainDB / 40.0);
+            b0 = A * ((A + 1) + (A - 1) * cos_omega + 2.0 * std::sqrt(A) * alpha);
+            b1 = -2.0 * A * ((A - 1) + (A + 1) * cos_omega);
+            b2 = A * ((A + 1) + (A - 1) * cos_omega - 2.0 * std::sqrt(A) * alpha);
+            a0 = (A + 1) - (A - 1) * cos_omega + 2.0 * std::sqrt(A) * alpha;
+            a1 = 2.0 * ((A - 1) - (A + 1) * cos_omega);
+            a2 = (A + 1) - (A - 1) * cos_omega - 2.0 * std::sqrt(A) * alpha;
         }
         break;
-
 
         default:
             break;
         }
-
 
         // Normalize coefficients by a0
         b0 /= a0;
@@ -208,16 +207,5 @@ private:
         b2 /= a0;
         a1 /= a0;
         a2 /= a0;
-
-
-        // could put coefficients in member vector, that can be returned by public getCoefficients(), used by FilterCurveComponent
-        // that access Filter from PluginProcessor, needs a get reference to filter
-        
-       
     }
-
-
-   
-
 };
-
