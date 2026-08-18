@@ -1,3 +1,11 @@
+/*
+  ==============================================================================
+
+    This file contains the basic framework code for a JUCE plugin processor.
+
+  ==============================================================================
+*/
+
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -30,6 +38,9 @@ FilterAudioProcessor::~FilterAudioProcessor()
     apvts.removeParameterListener("FILTER", this);
 
 }
+
+
+
 
 
 
@@ -139,30 +150,29 @@ bool FilterAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 }
 #endif
 
+void FilterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+{
+    juce::ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+   
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear (i, 0, buffer.getNumSamples());
 
-    void FilterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+    
+    for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
-        juce::ScopedNoDenormals noDenormals;
-        auto totalNumInputChannels  = getTotalNumInputChannels();
-        auto totalNumOutputChannels = getTotalNumOutputChannels();
+        auto* channelData = buffer.getWritePointer (channel);
 
-        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-            buffer.clear (i, 0, buffer.getNumSamples());
-
-        // Ensure coherent coefficient snapshot is published for this block (keeps UI and audio in sync)
-        for (size_t ch = 0; ch < mFilter.size(); ++ch)
-            mFilter[ch].ensureCoefficientsPublishedForBlock();
-
-        for (int channel = 0; channel < totalNumInputChannels; ++channel)
+      
+        for (size_t i = 0; i < buffer.getNumSamples(); i++)
         {
-            auto* channelData = buffer.getWritePointer (channel);
-            for (size_t i = 0; i < buffer.getNumSamples(); i++)
-                mFilter[channel].processSample(channelData[i]);
+            mFilter[channel].processSample(channelData[i]);
         }
+
     }
-
-
+}
 
 //==============================================================================
 bool FilterAudioProcessor::hasEditor() const
@@ -197,6 +207,54 @@ void FilterAudioProcessor::setStateInformation(const void* data, int sizeInBytes
     }
 }
 
+
+
+//void FilterAudioProcessor::getStateInformation(
+//    juce::MemoryBlock& destData) {
+//
+//
+//    juce::ValueTree params("Params");
+//
+//    for (auto& param : getParameters())
+//    {
+//        juce::ValueTree paramTree(getParamID(param));
+//        paramTree.setProperty("Value", param->getValue(), nullptr);
+//        params.appendChild(paramTree, nullptr);
+//
+//       
+//    }
+//
+//
+//    copyXmlToBinary(*params.createXml(), destData);
+//
+//
+//}
+//
+//void FilterAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+//{
+//
+//
+//    auto xml = getXmlFromBinary(data, sizeInBytes);
+//
+//    if (xml != nullptr)
+//    {
+//        auto preset = juce::ValueTree::fromXml(*xml);
+//
+//        for (auto& param : getParameters())
+//        {
+//            
+//            auto paramTree = preset.getChildWithName(getParamID(param));
+//
+//            if (paramTree.isValid())
+//                param->setValueNotifyingHost(paramTree["Value"]);
+//        }
+//    }
+//
+//    
+//
+//    
+//}
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
@@ -229,12 +287,4 @@ void FilterAudioProcessor::parameterChanged(const juce::String& parameterID, flo
         mFilter[0].setFilterType(newValue);
         mFilter[1].setFilterType(newValue);   
     }
-}
-
-// Return coefficients snapshot from selected channel
-std::array<double, MultiFilter::COEFF_COUNT> FilterAudioProcessor::getFilterCoefficients(int channel) const
-{
-    if (channel < 0 || channel > 1)
-        channel = 0;
-    return mFilter[channel].getCoefficients();
 }

@@ -1,9 +1,16 @@
+/*
+  ==============================================================================
+
+    This file contains the basic framework code for a JUCE plugin processor.
+
+  ==============================================================================
+*/
+
 #pragma once
 
 #include <JuceHeader.h>
 #include "MultiFilter.h"
 #include "ParameterLayout.h"
-#include <array>
 
 //==============================================================================
 /**
@@ -42,9 +49,6 @@ public:
 
     juce::AudioProcessorValueTreeState& getApvts() { return apvts; }
 
-    // New: expose coefficients from the internal filter for UI usage. Returns {B0,B1,B2,A0,A1,A2}
-    std::array<double, MultiFilter::COEFF_COUNT> getFilterCoefficients(int channel = 0) const;
-
     //==============================================================================
     int getNumPrograms() override;
     int getCurrentProgram() override;
@@ -68,8 +72,9 @@ public:
     }
 
 private:
-    // Use std::array to avoid accidental copies of MultiFilter (which contains atomics and is non-copyable)
-    std::array<MultiFilter, 2> mFilter;
+    MultiFilter mFilterRight;
+    MultiFilter mFilterLeft;
+    MultiFilter mFilter[2]{ mFilterLeft, mFilterRight };
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -81,6 +86,7 @@ private:
         return param->getName(50);
     }
 
+    
     // Listener callback when parameters change
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
