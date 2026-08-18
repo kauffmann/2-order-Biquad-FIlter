@@ -139,29 +139,30 @@ bool FilterAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 }
 #endif
 
-void FilterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
-{
-    juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-   
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
 
-    
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    void FilterAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
     {
-        auto* channelData = buffer.getWritePointer (channel);
+        juce::ScopedNoDenormals noDenormals;
+        auto totalNumInputChannels  = getTotalNumInputChannels();
+        auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-      
-        for (size_t i = 0; i < buffer.getNumSamples(); i++)
+        for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+            buffer.clear (i, 0, buffer.getNumSamples());
+
+        // Ensure coherent coefficient snapshot is published for this block (keeps UI and audio in sync)
+        for (size_t ch = 0; ch < mFilter.size(); ++ch)
+            mFilter[ch].ensureCoefficientsPublishedForBlock();
+
+        for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
-            mFilter[channel].processSample(channelData[i]);
+            auto* channelData = buffer.getWritePointer (channel);
+            for (size_t i = 0; i < buffer.getNumSamples(); i++)
+                mFilter[channel].processSample(channelData[i]);
         }
-
     }
-}
+
+
 
 //==============================================================================
 bool FilterAudioProcessor::hasEditor() const

@@ -36,7 +36,7 @@ FilterCurveComponent::FilterCurveComponent(FilterAudioProcessor& processor)
     mGain = mProcessor.getApvts().getRawParameterValue("GAIN");
     mFilterType = mProcessor.getApvts().getRawParameterValue("FILTER");
 
-
+    generateCurvePath();
 
 }
 
@@ -70,7 +70,7 @@ void FilterCurveComponent::paint(juce::Graphics& g)
     for (size_t i = 1; i < mCurvePoints.size(); ++i)
     {
         fillPath.lineTo(mCurvePoints[i]);
-        std::cout << "X:  " << mCurvePoints[i].getX() <<  "Y:  " <<  mCurvePoints[i].getY() << std::endl;
+
     }
 
     // Add lines down to bottom-right
@@ -204,9 +204,7 @@ void FilterCurveComponent::generateCurvePath()
     if (width <= 0 || height <= 0)
         return;
 
-    // Get filter type to determine stopband behavior
-    int filterTypeInt = static_cast<int>(mFilterType->load());
-    MultiFilter::FilterType filterTypeEnum = static_cast<MultiFilter::FilterType>(filterTypeInt);
+
 
     // Generate points across the frequency spectrum
     for (int i = 0; i < NUM_POINTS; ++i)
@@ -238,7 +236,7 @@ void FilterCurveComponent::generateCurvePath()
 
         }
     }
-
+    DBG("Generated curve path");
     // Request repaint
     repaint();
 }

@@ -68,9 +68,8 @@ public:
     }
 
 private:
-    MultiFilter mFilterRight;
-    MultiFilter mFilterLeft;
-    MultiFilter mFilter[2]{ mFilterLeft, mFilterRight };
+    // Use std::array to avoid accidental copies of MultiFilter (which contains atomics and is non-copyable)
+    std::array<MultiFilter, 2> mFilter;
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -81,7 +80,7 @@ private:
 
         return param->getName(50);
     }
-    
+
     // Listener callback when parameters change
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
