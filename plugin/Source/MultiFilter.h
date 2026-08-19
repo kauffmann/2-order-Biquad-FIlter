@@ -1,7 +1,7 @@
 /*
   ==============================================================================
 
-    LowPassFilter.h
+
   
     Author:  Michael kauffmann
 
@@ -13,6 +13,7 @@
 
 
 #include <JuceHeader.h>
+#include <cmath>
 
 /* Use: 
    
@@ -49,8 +50,18 @@ public:
         // Reset smoothing with the audio sample rate and a 50ms smoothing time
         smoothedCutoffFreq.reset(samplingRate, 0.05); // Smooth over 50 ms
 
-        // Ensure the smoothed value starts at the current cutoffFrequency to avoid jumps
+        // Clamp cutoffFrequency to (0, Nyquist)
+        double maxCutoff = std::max(1.0, samplingRate * 0.5 - 1.0);
+        if (cutoffFrequency > maxCutoff)
+            cutoffFrequency = maxCutoff;
+        if (cutoffFrequency <= 0.0)
+            cutoffFrequency = 1e-6;
+
+        // Ensure the smoothed value starts at the (possibly clamped) cutoffFrequency to avoid jumps
         smoothedCutoffFreq.setCurrentAndTargetValue(cutoffFrequency);
+
+        // Clear filter history to avoid artifacts when the sample rate changes
+        prevX1 = prevX2 = prevY1 = prevY2 = 0.0;
 
         // Recalculate coefficients for the initial state
         updateCoefficients();
@@ -63,13 +74,17 @@ public:
         // The audio thread will read the smoothed values in processSample() and
         // update coefficients there. This prevents abrupt coefficient changes that
         // cause audible clicks/pops when the user first moves the slider.
-        smoothedCutoffFreq.setTargetValue(static_cast<double>(cutoffFreq));
+        // Clamp to valid range (0, Nyquist)
+        double maxCutoff = std::max(1.0, samplingRate * 0.5 - 1.0);
+        double clamped = std::max(1e-6, std::min(static_cast<double>(cutoffFreq), maxCutoff));
+        smoothedCutoffFreq.setTargetValue(clamped);
     }
 
 
-    void setResonans(float resonans)
+    void setResonance(float resonance)
     {
-        Q = resonans;
+        // Ensure Q stays positive and finite
+        Q = std::max(1e-6, static_cast<double>(resonance));
         updateCoefficients();
     }
 
@@ -93,8 +108,8 @@ public:
         // getNextValue() simply returns the same value. This is real-time safe.
         double newCutoff = smoothedCutoffFreq.getNextValue();
 
-        // If cutoff actually changed, update the internal cutoff and recalc coeffs
-        if (newCutoff != cutoffFrequency)
+        // If cutoff actually changed beyond a tiny epsilon, update the internal cutoff and recalc coeffs
+        if (std::abs(newCutoff - cutoffFrequency) > 1e-6)
         {
             cutoffFrequency = newCutoff;
             updateCoefficients();

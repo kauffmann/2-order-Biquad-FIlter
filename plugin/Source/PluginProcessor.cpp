@@ -272,8 +272,8 @@ void FilterAudioProcessor::parameterChanged(const juce::String& parameterID, flo
     }
     else if (parameterID == "RESONANCE")
     {
-        mFilter[0].setResonans(newValue);
-        mFilter[1].setResonans(newValue);
+        mFilter[0].setResonance(newValue);
+        mFilter[1].setResonance(newValue);
     }
 
     else if (parameterID == "GAIN")

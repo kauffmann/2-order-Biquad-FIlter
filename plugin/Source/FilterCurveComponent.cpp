@@ -70,7 +70,6 @@ void FilterCurveComponent::paint(juce::Graphics& g)
     for (size_t i = 1; i < mCurvePoints.size(); ++i)
     {
         fillPath.lineTo(mCurvePoints[i]);
-        std::cout << "X:  " << mCurvePoints[i].getX() <<  "Y:  " <<  mCurvePoints[i].getY() << std::endl;
     }
 
     // Add lines down to bottom-right
@@ -164,7 +163,7 @@ float FilterCurveComponent::calculateMagnitudeAt(float frequency) const
     int filterType = static_cast<int>( mFilterType->load());
     
     tempFilter.setCutoffFrequency(cutoff);
-    tempFilter.setResonans(resonance);
+    tempFilter.setResonance(resonance);
     tempFilter.setGain(gain);
     tempFilter.setFilterType(filterType);
     
@@ -183,6 +182,7 @@ float FilterCurveComponent::calculateMagnitudeAt(float frequency) const
 
     MultiFilter::FilterType filterTypeEnum = static_cast<MultiFilter::FilterType>(filterType);
 
+    // Yes, we are violating DRY, same logic also in MultiFilter.h ,  but small project, easy to overview and maintain if changes happens to logic.
 
     switch (filterTypeEnum)
     {
