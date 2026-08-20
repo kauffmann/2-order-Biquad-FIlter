@@ -58,22 +58,22 @@ CPMAddPackage(
 
 
 # Adds googletest.
-# CPMAddPackage(
- #   NAME GOOGLETEST
-  #  GITHUB_REPOSITORY google/googletest
-   # GIT_TAG v1.14.0
-    #VERSION 1.14.0
-   # SOURCE_DIR ${LIB_DIR}/googletest
-   # OPTIONS
-   #     "INSTALL_GTEST OFF"
-   #     "gtest_force_shared_crt ON"
-#)
+ CPMAddPackage(
+    NAME GOOGLETEST
+    GITHUB_REPOSITORY google/googletest
+    GIT_TAG v1.18.0
+    VERSION 1.18.0
+    SOURCE_DIR ${LIB_DIR}/googletest
+    OPTIONS
+        "INSTALL_GTEST OFF"
+        "gtest_force_shared_crt ON"
+)
 
 
 
 
 # This command allows running tests from the "build" folder (the one where CMake generates the project to).
-#enable_testing()
+enable_testing()
 
 
 # Must add all dir that has a cmakeLists file that define targets ----------------
@@ -87,15 +87,10 @@ add_subdirectory(assets)
 add_subdirectory(plugin)
 
 # Adds all the targets configured in the "test" folder.
-# add_subdirectory(test)
+add_subdirectory(test)
 
 
 
 
       
 # ---------------------------------------------------------------------------------
-
-
-
-
-

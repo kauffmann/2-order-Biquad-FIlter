@@ -33,6 +33,24 @@ The first run will take the most time because the dependencies need to be downlo
 On Mac/Xcode you must first run config from terminal, creating a .xcodeproj file you can open in xcode(cmake -S . -B build -G Xcode).
 In visual studio and visual studio code you can do this within editor IDE, using build in terminal.
 
+## DSP tests and Python analysis
+
+The GoogleTest suite covers `MultiFilter` response and `FilterAudioProcessor` integration:
+
+```bash
+cmake -S . -B build -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build --target dsp_tests
+ctest --test-dir build --output-on-failure
+```
+
+To export measured frequency responses and create a matplotlib plot:
+
+```bash
+python3 -m pip install --user matplotlib
+cmake --build build --target dsp_plot
+```
+
+The CSV and PNG files are written below `build/test/`. In CLion, select the same interpreter under **Settings/Preferences > Project > Python Interpreter**, then create a Python run configuration for `test/python/plot_response.py`.
 
 
 
