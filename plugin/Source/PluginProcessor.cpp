@@ -207,54 +207,6 @@ void FilterAudioProcessor::setStateInformation(const void* data, int sizeInBytes
     }
 }
 
-
-
-//void FilterAudioProcessor::getStateInformation(
-//    juce::MemoryBlock& destData) {
-//
-//
-//    juce::ValueTree params("Params");
-//
-//    for (auto& param : getParameters())
-//    {
-//        juce::ValueTree paramTree(getParamID(param));
-//        paramTree.setProperty("Value", param->getValue(), nullptr);
-//        params.appendChild(paramTree, nullptr);
-//
-//       
-//    }
-//
-//
-//    copyXmlToBinary(*params.createXml(), destData);
-//
-//
-//}
-//
-//void FilterAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
-//{
-//
-//
-//    auto xml = getXmlFromBinary(data, sizeInBytes);
-//
-//    if (xml != nullptr)
-//    {
-//        auto preset = juce::ValueTree::fromXml(*xml);
-//
-//        for (auto& param : getParameters())
-//        {
-//            
-//            auto paramTree = preset.getChildWithName(getParamID(param));
-//
-//            if (paramTree.isValid())
-//                param->setValueNotifyingHost(paramTree["Value"]);
-//        }
-//    }
-//
-//    
-//
-//    
-//}
-
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
